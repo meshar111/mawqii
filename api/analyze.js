@@ -1,4 +1,4 @@
-import { geocode, nearby, summarize } from "../lib/places.js";
+import { locate, nearby, summarize } from "../lib/places.js";
 import { opportunityScore, financialFlags } from "../lib/scoring.js";
 import * as cache from "../lib/cache.js";
 
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     if (cached) return res.status(200).json({ ...cached, cached:true });
 
     // 1) إحداثيات الحي
-    const loc = await geocode(`حي ${hood}، ${city}، ${country}`);
+    const loc = await locate({ hood, city, country });
 
     // 2) فحص كل قطاع + حساب الدرجة
     const sectors = [];
