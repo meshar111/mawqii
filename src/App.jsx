@@ -142,22 +142,22 @@ export default function App(){
 
   // يحوّل رد السيرفر إلى شكل بيانات الواجهة
   function mapLive(j){
-    const sectorMap={ restaurant:"food", cafe:"food", supermarket:"retail",
-      kids:"kids", gym:"health", laundry:"serv", pharmacy:"health" };
+    const sm={ food:"food", retail:"retail", kids:"kids", serv:"serv", health:"health", fun:"kids" };
     return {
       score: j.overall,
-      verdict: j.sectors?.[0]?.verdict || "—",
-      cells: (j.sectors||[]).flatMap(s=>[s.score, Math.max(0,s.score-8), Math.min(100,s.score+6)]).slice(0,16),
-      profile: DEMO.profile,   // تُستبدل ببيانات سكانية حقيقية لاحقاً
-      types: (j.sectors||[]).map(s=>({
-        s: sectorMap[s.id]||"serv", n:s.label, count:s.count,
+      verdict: j.overall>=75?"فرصة قوية":j.overall>=55?"فرصة جيدة مع تحفّظ":j.overall>=40?"تحتاج تمايزاً واضحاً":"غير موصى به",
+      cells: (j.sectors||[]).map(s=>s.score).slice(0,16),
+      profile: DEMO.profile,
+      types: (j.sectors||[]).map(s=>({ s: sm[s.sector]||"serv", n:s.label, count:s.count,
         rating: s.avgRating||"—", state:s.state })),
       gaps: (j.gaps||[]).map(g=>({ s:"all", t:g.sector, why:g.why,
-        fit:`درجة الفرصة ${g.score}/100` })),
+        fit:`درجة الفرصة ${g.score}/100${g.capital?` · رأس مال ${g.capital}`:""}` })),
       extras: DEMO.extras,
-      risks: (j.sectors||[]).flatMap(s=>s.flags||[]).slice(0,4),
+      risks: (j.sectors||[]).flatMap(s=>s.flags||[]).filter((v,i,a)=>a.indexOf(v)===i).slice(0,4),
       checks: DEMO.checks,
       meta: j.meta,
+      discovery: j.discovery,
+      landmarks: j.landmarks,
     };
   }
 
@@ -450,6 +450,65 @@ export default function App(){
                 </div>))}
             </div>)}
           </Panel>
+
+          {/* معالم الحي — أساس الاستنتاج */}
+          {D.landmarks?.length>0 && (
+          <Panel title="معالم الحي">
+            <p style={{margin:"0 0 12px",color:T.muted,fontSize:14.5,lineHeight:1.8}}>
+              هذه المعالم تُقرأ لاستنتاج أنماط الحركة والطلب في الحي.
+            </p>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              {D.landmarks.map(l=>(
+                <div key={l.label} style={{background:T.paper2,border:`1px solid ${T.line}`,borderRadius:13,
+                  padding:"11px 18px",display:"flex",alignItems:"center",gap:9}}>
+                  <span className="disp" style={{fontSize:22,fontWeight:800,color:T.cool}}>{l.count}</span>
+                  <span style={{fontSize:14.5,fontWeight:700,color:T.ink2}}>{l.label}</span>
+                </div>))}
+            </div>
+          </Panel>)}
+
+          {/* الاكتشاف — إشارات مباشرة */}
+          {D.discovery?.direct?.length>0 && (
+          <Panel title="إشارات حاجة في الحي">
+            <p style={{margin:"0 0 14px",color:T.muted,fontSize:14.5,lineHeight:1.8}}>
+              مستخرجة من الأنشطة المرصودة فعلياً — لا من استبيان لرغبات السكان.
+            </p>
+            <div style={{display:"grid",gap:10}}>
+              {D.discovery.direct.map((d,i)=>{
+                const c = d.kind==="غياب تام"?T.gap : d.kind==="جودة ضعيفة"?T.hot : T.gold;
+                return (
+                <div key={i} style={{border:`1px solid ${T.line}`,borderRadius:14,padding:15,background:"#fff"}}>
+                  <div style={{display:"flex",gap:9,alignItems:"center",flexWrap:"wrap",marginBottom:7}}>
+                    <span className="disp" style={{fontWeight:800,fontSize:16.5}}>{d.activity}</span>
+                    <span style={{fontSize:11.5,fontWeight:800,padding:"4px 11px",borderRadius:99,
+                      background:c+"1f",color:c}}>{d.kind}</span>
+                    {d.capital&&<span style={{fontSize:11.5,fontWeight:700,padding:"4px 11px",borderRadius:99,
+                      background:T.paper2,color:T.muted}}>رأس مال {d.capital}</span>}
+                  </div>
+                  <p style={{margin:0,fontSize:14.5,lineHeight:1.8,color:T.ink2}}>{d.signal}</p>
+                </div>);})}
+            </div>
+          </Panel>)}
+
+          {/* أفكار مستنتجة — خارج الصندوق */}
+          {D.discovery?.inferred?.length>0 && (
+          <Panel title="أفكار لم تفكّر بها">
+            <p style={{margin:"0 0 14px",color:T.muted,fontSize:14.5,lineHeight:1.8}}>
+              أنشطة تدعمها تركيبة الحي — اجتهاد استنتاجي، لا بيانات طلب مؤكدة.
+            </p>
+            <div style={{display:"grid",gap:12}}>
+              {D.discovery.inferred.map((g,i)=>(
+                <div key={i} style={{border:`1.5px solid ${T.gold}`,borderRadius:14,padding:16,background:"#FDFAF2"}}>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:9}}>
+                    {g.ideas.map(idea=>(
+                      <span key={idea} style={{background:"#fff",border:`1px solid #E5D3A6`,borderRadius:99,
+                        padding:"7px 15px",fontSize:14,fontWeight:700,color:T.ink}}>{idea}</span>))}
+                  </div>
+                  <p style={{margin:0,fontSize:14,lineHeight:1.8,color:T.ink2}}>
+                    <b style={{color:T.gold}}>لماذا؟ </b>{g.why}</p>
+                </div>))}
+            </div>
+          </Panel>)}
 
           {/* ترشيحات إضافية */}
           <Panel title="ترشيحات أخرى تخدم نفس الحي">
