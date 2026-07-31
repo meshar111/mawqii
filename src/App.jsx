@@ -123,6 +123,33 @@ const DEMO = {
     "تحقّق من مواقف السيارات في وقت الذروة.",
     "راجع اشتراطات البلدية للنشاط قبل توقيع العقد.",
   ],
+  landmarks: [
+    { label:"مدارس", count:6 }, { label:"مساجد", count:7 },
+    { label:"حدائق", count:2 }, { label:"بنوك", count:3 },
+  ],
+  discovery: {
+    density: 58,
+    direct: [
+      { activity:"محلات حلى وحلويات", kind:"غياب تام", capital:"منخفض",
+        signal:"لا يوجد أي محل حلى ضمن النطاق — السكان يخرجون خارج الحي لهذه الحاجة." },
+      { activity:"مراكز ألعاب أطفال", kind:"جودة ضعيفة", capital:"متوسط",
+        signal:"مركز واحد بمتوسط تقييم ٣.٤ — الطلب موجود لكن الرضا منخفض، ومساحة التميّز واسعة." },
+      { activity:"مغاسل سيارات", kind:"غياب تام", capital:"منخفض",
+        signal:"لا توجد أي مغسلة سيارات ضمن النطاق رغم كثافة الحركة." },
+      { activity:"عصائر ومشروبات", kind:"ندرة", capital:"منخفض",
+        signal:"واحد فقط في حي نشط تجارياً — تغطية أقل من حاجة الحي." },
+    ],
+    inferred: [
+      { ideas:["مركز دروس ومهارات بعد الدوام","قرطاسية وطباعة","مقهى دراسة هادئ","محل حلى قرب المدارس"],
+        why:"٦ مدارس في النطاق — حركة عائلية يومية وأطفال في أوقات محددة." },
+      { ideas:["محل عطور وبخور","مكتبة ومستلزمات دينية","محل تمور وضيافة"],
+        why:"٧ مساجد — حركة يومية متكررة وأنماط شراء مرتبطة بها." },
+      { ideas:["محل حلى وحلويات","مقهى حلويات","بوفيه كيك وتورتات"],
+        why:"كثافة مطاعم عالية مع غياب محلات الحلى — الحلى مكمّل طبيعي بعد الوجبات." },
+      { ideas:["عربة قهوة متنقلة","تأجير دراجات وسكوتر","محل ألعاب خارجية"],
+        why:"حديقتان — تجمّعات مسائية وعائلية تخلق طلباً موسمياً ومتكرراً." },
+    ],
+  },
 };
 
 export default function App(){
@@ -156,8 +183,8 @@ export default function App(){
       risks: (j.sectors||[]).flatMap(s=>s.flags||[]).filter((v,i,a)=>a.indexOf(v)===i).slice(0,4),
       checks: DEMO.checks,
       meta: j.meta,
-      discovery: j.discovery,
-      landmarks: j.landmarks,
+      discovery: (j.discovery && (j.discovery.direct?.length || j.discovery.inferred?.length)) ? j.discovery : DEMO.discovery,
+      landmarks: j.landmarks?.length ? j.landmarks : DEMO.landmarks,
     };
   }
 
@@ -215,7 +242,7 @@ export default function App(){
           </div>
           <div style={{flex:"1 1 auto",minWidth:0}}>
             <div className="disp" style={{fontWeight:800,fontSize:19,letterSpacing:"-.3px"}}>مَوقِعي</div>
-            <div style={{fontSize:12.5,color:T.muted}}>ذكاء موقعي لمن ينوي فتح مطعم</div>
+            <div style={{fontSize:12.5,color:T.muted}}>ذكاء موقعي لمن ينوي فتح مشروع</div>
           </div>
           <nav aria-label="مراحل" style={{display:"flex",gap:6,fontSize:12.5,fontWeight:700}}>
             {["الموقع","التحليل"].map((s,i)=>(
