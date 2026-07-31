@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       c.sector === "_ref" ||
       ["restaurant","cafe","dessert","supermarket","pharmacy","gym",
        "kids_play","daycare","laundry","carwash","salon","juice",
-       "florist","clinic","tutoring","bakery"].includes(c.id));
+       "florist","clinic","dentist","spa","courier","bakery"].includes(c.id));
 
     // تنفيذ متوازٍ على دفعات — يختصر الوقت من ~20 ثانية إلى ~3
     const BATCH = 8;
