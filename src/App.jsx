@@ -163,9 +163,29 @@ export default function App(){
   const [busy,setBusy]=useState(false);
   const [live,setLive]=useState(null);
   const [notice,setNotice]=useState("");
+  const [sugg,setSugg]=useState([]);          // اقتراحات الأحياء
+  const [picked,setPicked]=useState(null);    // الاقتراح المختار (بإحداثياته)
+  const [loadingSugg,setLoadingSugg]=useState(false);
   const D = live || DEMO;
   const reportId = React.useMemo(()=>"MQ-"+Math.random().toString(36).slice(2,7).toUpperCase(),[]);
   const today = new Date().toLocaleDateString("ar-SA",{year:"numeric",month:"long",day:"numeric"});
+
+  // جلب اقتراحات الأحياء أثناء الكتابة — مع تأخير لتقليل الطلبات
+  React.useEffect(()=>{
+    if(!hood || hood.trim().length < 2 || picked){ setSugg([]); return; }
+    const t = setTimeout(async ()=>{
+      setLoadingSugg(true);
+      try{
+        const r = await fetch("/api/suggest",{ method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ q:hood, city, country }) });
+        const j = await r.json();
+        setSugg(j.items||[]);
+      }catch{ setSugg([]); }
+      finally{ setLoadingSugg(false); }
+    }, 450);
+    return ()=>clearTimeout(t);
+  },[hood, city, country, picked]);
 
   // يحوّل رد السيرفر إلى شكل بيانات الواجهة
   // يبني التقرير كاملاً من البيانات الحيّة — لا شيء ثابت
@@ -239,6 +259,8 @@ export default function App(){
       const r = await fetch("/api/analyze",{ method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ country, city, hood, radius:2000,
+          coords: picked ? { lat:picked.lat, lng:picked.lng } : null,
+          placeName: picked ? (picked.address || picked.name) : null,
           profile:{ apartmentsPct:74, schools:6, youngPct:63 } }) });
       const j = await r.json();
       if(j.error) throw new Error(j.error);
@@ -320,21 +342,42 @@ export default function App(){
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14}}>
               <Field label="الدولة">
                 <select value={country} onChange={e=>{const c=e.target.value;const ct=Object.keys(COUNTRIES[c])[0];
-                  setCountry(c);setCity(ct);setHood(COUNTRIES[c][ct][0]);}} style={sel}>
+                  setCountry(c);setCity(ct);setHood(COUNTRIES[c][ct][0]);setPicked(null);setSugg([]);}} style={sel}>
                   {Object.keys(COUNTRIES).map(c=><option key={c}>{c}</option>)}
                 </select>
               </Field>
               <Field label="المدينة">
-                <select value={city} onChange={e=>{setCity(e.target.value);setHood(COUNTRIES[country][e.target.value][0]);}} style={sel}>
+                <select value={city} onChange={e=>{setCity(e.target.value);setHood(COUNTRIES[country][e.target.value][0]);setPicked(null);setSugg([]);}} style={sel}>
                   {Object.keys(COUNTRIES[country]).map(c=><option key={c}>{c}</option>)}
                 </select>
               </Field>
-              <Field label="الحي — اكتب أي حي أو اختر من القائمة">
-                <input list="hoods" value={hood} onChange={e=>setHood(e.target.value)}
-                  placeholder="اكتب اسم حيّك…" style={sel}/>
-                <datalist id="hoods">
-                  {COUNTRIES[country][city].map(h=><option key={h} value={h}/>)}
-                </datalist>
+              <Field label="الحي أو الموقع — اكتب واختر من الاقتراحات">
+                <div style={{position:"relative"}}>
+                  <input value={hood}
+                    onChange={e=>{ setHood(e.target.value); setPicked(null); }}
+                    placeholder="اكتب اسم الحي أو معلماً قريباً…" style={sel}/>
+                  {picked && (
+                    <div style={{marginTop:8,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",
+                      background:"#F2FAF9",border:`1px solid #BFE3DE`,borderRadius:11,padding:"9px 13px"}}>
+                      <span style={{color:T.gap,fontWeight:800,fontSize:13}}>✓ موقع محدَّد</span>
+                      <span style={{fontSize:12.5,color:T.ink2,flex:"1 1 auto",minWidth:0}}>{picked.address||picked.name}</span>
+                      <button onClick={()=>{setPicked(null);}} style={{...ghost,padding:"4px 12px",fontSize:12}}>تغيير</button>
+                    </div>)}
+                  {!picked && loadingSugg && (
+                    <div style={{marginTop:6,fontSize:12.5,color:T.muted}}>جارٍ البحث…</div>)}
+                  {!picked && sugg.length>0 && (
+                    <div style={{marginTop:6,border:`1px solid ${T.line}`,borderRadius:12,overflow:"hidden",
+                      background:"#fff",boxShadow:"0 8px 20px rgba(13,31,42,.08)"}}>
+                      {sugg.map((sg,i)=>(
+                        <button key={i} onClick={()=>{ setPicked(sg); setHood(sg.name||hood); setSugg([]); }}
+                          style={{display:"block",width:"100%",textAlign:"right",padding:"11px 14px",
+                            border:"none",borderBottom:i<sugg.length-1?`1px solid ${T.line}`:"none",
+                            background:"#fff",cursor:"pointer"}}>
+                          <div style={{fontWeight:700,fontSize:14.5,color:T.ink}}>{sg.name}</div>
+                          <div style={{fontSize:12.5,color:T.muted,marginTop:2}}>{sg.address}</div>
+                        </button>))}
+                    </div>)}
+                </div>
               </Field>
               <Field label="ميزانية التأسيس">
                 <select value={budget} onChange={e=>setBudget(e.target.value)} style={sel}>
