@@ -11,14 +11,21 @@ export default async function handler(req, res) {
   if (!process.env.GOOGLE_PLACES_KEY) return res.status(500).json({ error:"GOOGLE_PLACES_KEY غير مضبوط" });
 
   try {
-    const { country="السعودية", city, hood, radius=2000, profile={}, deep=false } = req.body || {};
+    const { country="السعودية", city, hood, radius=2000, profile={}, deep=false,
+            coords=null, placeName=null } = req.body || {};
     if (!city || !hood) return res.status(400).json({ error:"المدينة والحي مطلوبان" });
 
-    const cacheKey = `${country}|${city}|${hood}|${radius}|${deep?"deep":"std"}`;
+    // مفتاح الكاش يعتمد على الإحداثيات إن وُجدت — أدق وأضمن
+    const locKey = coords ? `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}` : `${city}|${hood}`;
+    const cacheKey = `${country}|${locKey}|${radius}|${deep?"deep":"std"}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.status(200).json({ ...cached, cached:true });
 
-    const loc = await locate({ hood, city, country });
+    // إن اختار المستخدم اقتراحاً جاهزاً، نستخدم إحداثياته مباشرة — بلا Geocoding
+    const loc = coords && coords.lat && coords.lng
+      ? { lat: coords.lat, lng: coords.lng,
+          formatted: placeName || `${hood}، ${city}`, exact: true, source: "اختيار المستخدم" }
+      : await locate({ hood, city, country });
 
     // المسح: الوضع القياسي 20 نشاطاً · العميق كل الكتالوج
     const list = deep ? CATALOG : CATALOG.filter(c =>
@@ -66,7 +73,7 @@ export default async function handler(req, res) {
 
     const result = {
       meta:{ country, city, hood, radius, deep, coords:{lat:loc.lat,lng:loc.lng},
-             address:loc.formatted, exact:loc.exact !== false,
+             address:loc.formatted, exact:loc.exact !== false, locSource: loc.source || "بحث تلقائي",
              note: loc.exact === false ? "تعذّر تحديد الحي بدقة — استُخدم مركز المدينة كمرجع" : null,
              scanned: business.length, generatedAt:new Date().toISOString(),
              reportId:"MQ-"+Math.random().toString(36).slice(2,7).toUpperCase() },
