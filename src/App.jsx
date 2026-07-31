@@ -168,23 +168,68 @@ export default function App(){
   const today = new Date().toLocaleDateString("ar-SA",{year:"numeric",month:"long",day:"numeric"});
 
   // يحوّل رد السيرفر إلى شكل بيانات الواجهة
+  // يبني التقرير كاملاً من البيانات الحيّة — لا شيء ثابت
   function mapLive(j){
     const sm={ food:"food", retail:"retail", kids:"kids", serv:"serv", health:"health", fun:"kids" };
+    const L = Object.fromEntries((j.landmarks||[]).map(l=>[l.label,l.count]));
+    const S = Object.fromEntries((j.sectors||[]).map(x=>[x.label,x]));
+    const dens = j.discovery?.density ?? 0;
+
+    // ملمح الحي — مشتق من المعالم والكثافة الفعلية
+    const schools=L["مدارس"]||0, mosques=L["مساجد"]||0, parks=L["حدائق"]||0, banks=L["بنوك"]||0;
+    const headline = schools>=4 ? "حي عائلي — كثافة مدارس عالية"
+      : banks>=3 ? "حي تجاري/مكتبي — حركة نهارية"
+      : dens>=45 ? "حي نشط تجارياً"
+      : dens<=15 ? "حي هادئ — خدمات محدودة" : "حي سكني متوازن";
+    const reading = [
+      schools>=4 ? `${schools} مدارس تعني حركة عائلية يومية وذروة صباحية ومسائية.` : null,
+      mosques>=5 ? `${mosques} مساجد تشير إلى كثافة سكنية وحركة يومية متكررة.` : null,
+      parks>=2 ? `${parks} حدائق تخلق تجمّعات مسائية وطلباً موسمياً.` : null,
+      banks>=2 ? `${banks} بنوك تدل على نشاط مكتبي وطلب على وجبات سريعة.` : null,
+      `إجمالي ${dens} نشاطاً مرصوداً في النطاق — ${dens>=45?"منافسة مرتفعة":dens>=20?"منافسة معتدلة":"تغطية خدمية منخفضة"}.`,
+    ].filter(Boolean).join(" ");
+
+    const facts = [
+      { k:"أنشطة مرصودة", v:String(dens), tone: dens<=20?"gap":"cool" },
+      { k:"مدارس قريبة", v:String(schools), tone: schools>=4?"gap":"cool" },
+      { k:"مساجد قريبة", v:String(mosques), tone:"cool" },
+      { k:"حدائق ومتنزهات", v:String(parks), tone: parks>=2?"gap":"cool" },
+    ];
+
+    // ترشيحات إضافية — من الاكتشافات الحقيقية
+    const extras = (j.discovery?.direct||[]).slice(0,3).map(d=>({
+      t: d.activity, why: d.signal, tag: d.capital?`رأس مال ${d.capital}`:d.kind }));
+
+    // تحقّق ميدانياً — أسئلة مبنية على وضع هذا الحي
+    const checks = [
+      `زر الموقع في ثلاث أوقات مختلفة وعُدّ المارّة${schools>=4?" — خصوصاً وقت خروج المدارس":""}.`,
+      dens>=45 ? "الحي مزدحم تجارياً — تأكد من توفّر مواقف كافية." : "الحي أقل ازدحاماً — تحقّق من كفاية الحركة المارّة.",
+      "اسأل جيران المحل عن سبب إغلاق المحال السابقة في الموقع.",
+      "راجع اشتراطات البلدية للنشاط والمساحة قبل توقيع العقد.",
+    ];
+
+    // مخاطر — مشتقة من الوضع الفعلي + تحذيرات مالية غير مكررة
+    const saturated = (j.sectors||[]).filter(x=>x.state==="مشبع").map(x=>x.label);
+    const risks = [
+      saturated.length ? `قطاعات مشبعة في هذا الحي: ${saturated.slice(0,4).join(" · ")} — الدخول فيها يتطلب تمايزاً واضحاً.` : null,
+      j.meta?.exact===false ? "لم يُحدَّد الحي بدقة — النتائج مبنية على مركز المدينة وقد لا تعكس الحي تحديداً." : null,
+      ...(j.sectors||[]).flatMap(x=>x.flags||[]),
+    ].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).slice(0,5);
+
     return {
       score: j.overall,
       verdict: j.overall>=75?"فرصة قوية":j.overall>=55?"فرصة جيدة مع تحفّظ":j.overall>=40?"تحتاج تمايزاً واضحاً":"غير موصى به",
-      cells: (j.sectors||[]).map(s=>s.score).slice(0,16),
-      profile: DEMO.profile,
-      types: (j.sectors||[]).map(s=>({ s: sm[s.sector]||"serv", n:s.label, count:s.count,
-        rating: s.avgRating||"—", state:s.state })),
+      cells: (j.sectors||[]).map(x=>x.score).slice(0,16),
+      profile: { headline, facts, reading },
+      types: (j.sectors||[]).map(x=>({ s: sm[x.sector]||"serv", n:x.label, count:x.count,
+        rating: x.avgRating||"—", state:x.state })),
       gaps: (j.gaps||[]).map(g=>({ s:"all", t:g.sector, why:g.why,
         fit:`درجة الفرصة ${g.score}/100${g.capital?` · رأس مال ${g.capital}`:""}` })),
-      extras: DEMO.extras,
-      risks: (j.sectors||[]).flatMap(s=>s.flags||[]).filter((v,i,a)=>a.indexOf(v)===i).slice(0,4),
-      checks: DEMO.checks,
+      extras: extras.length ? extras : [],
+      risks, checks,
       meta: j.meta,
-      discovery: (j.discovery && (j.discovery.direct?.length || j.discovery.inferred?.length)) ? j.discovery : DEMO.discovery,
-      landmarks: j.landmarks?.length ? j.landmarks : DEMO.landmarks,
+      discovery: j.discovery,
+      landmarks: j.landmarks,
     };
   }
 
@@ -374,11 +419,19 @@ export default function App(){
                 </div>
               </div>
             </div>
-            {D.meta?.note && <div style={{marginTop:12,background:"#FFF4F1",border:"1px solid #F6C9BE",
-              borderRadius:12,padding:"10px 14px",fontSize:13,color:"#B0432C",lineHeight:1.7,fontWeight:700}}>
-              ⚠️ {D.meta.note}</div>}
-            {notice&&<div style={{marginTop:12,background:"#FFF7E8",border:"1px solid #EFD9A8",
-              borderRadius:12,padding:"10px 14px",fontSize:13,color:"#8A6A1F",lineHeight:1.7}}>{notice}</div>}
+          {/* شريط حالة البيانات — يمنع الالتباس */}
+          <div style={{marginTop:12,padding:"12px 16px",borderRadius:12,fontSize:13.5,lineHeight:1.7,fontWeight:700,
+            background: live ? (D.meta?.exact===false ? "#FFF4F1" : "#F2FAF9") : "#FFF7E8",
+            border: `1px solid ${live ? (D.meta?.exact===false ? "#F6C9BE" : "#BFE3DE") : "#EFD9A8"}`,
+            color: live ? (D.meta?.exact===false ? "#B0432C" : "#0B7268") : "#8A6A1F"}}>
+            {!live
+              ? "⚠️ هذا نموذج توضيحي — الأرقام ثابتة ولا تعبّر عن الحي المختار."
+              : D.meta?.exact===false
+                ? `⚠️ لم يُحدَّد حي "${hood}" بدقة — النتائج مبنية على مركز ${city}، وستتشابه بين أحياء المدينة نفسها.`
+                : `✅ بيانات حيّة — فُحص ${D.meta?.scanned||"—"} نشاطاً حول: ${D.meta?.address||"الموقع المحدد"}`}
+          </div>
+          {notice&&<div style={{marginTop:12,background:"#FFF7E8",border:"1px solid #EFD9A8",
+            borderRadius:12,padding:"10px 14px",fontSize:13,color:"#8A6A1F",lineHeight:1.7}}>{notice}</div>}
           </div>
 
           {/* رأس النتيجة */}
