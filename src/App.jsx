@@ -359,6 +359,8 @@ export default function App(){
                 <div>
                   <div className="disp" style={{fontWeight:900,fontSize:20,letterSpacing:"-.3px"}}>تقرير ذكاء موقعي</div>
                   <div style={{fontSize:13.5,color:T.muted}}>{city} · حي {hood} · نطاق ٢ كم</div>
+                  {D.meta?.address && <div style={{fontSize:12.5,color:T.muted,marginTop:4}}>
+                    الموقع المُحدَّد: {D.meta.address}</div>}
                 </div>
               </div>
               <div style={{textAlign:"left",fontSize:12.5,color:T.muted,lineHeight:1.9}}>
@@ -372,6 +374,9 @@ export default function App(){
                 </div>
               </div>
             </div>
+            {D.meta?.note && <div style={{marginTop:12,background:"#FFF4F1",border:"1px solid #F6C9BE",
+              borderRadius:12,padding:"10px 14px",fontSize:13,color:"#B0432C",lineHeight:1.7,fontWeight:700}}>
+              ⚠️ {D.meta.note}</div>}
             {notice&&<div style={{marginTop:12,background:"#FFF7E8",border:"1px solid #EFD9A8",
               borderRadius:12,padding:"10px 14px",fontSize:13,color:"#8A6A1F",lineHeight:1.7}}>{notice}</div>}
           </div>
