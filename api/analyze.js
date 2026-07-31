@@ -4,6 +4,8 @@ import { CATALOG, SECTOR_LABELS } from "../lib/catalog.js";
 import { discoverOpportunities } from "../lib/discover.js";
 import * as cache from "../lib/cache.js";
 
+export const config = { maxDuration: 60 };
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error:"Method not allowed" });
   if (!process.env.GOOGLE_PLACES_KEY) return res.status(500).json({ error:"GOOGLE_PLACES_KEY غير مضبوط" });
@@ -21,21 +23,27 @@ export default async function handler(req, res) {
     // المسح: الوضع القياسي 20 نشاطاً · العميق كل الكتالوج
     const list = deep ? CATALOG : CATALOG.filter(c =>
       c.sector === "_ref" ||
-      ["restaurant","cafe","bakery","dessert","supermarket","pharmacy","gym",
-       "kids_play","daycare","laundry","carwash","salon","barber","juice",
-       "phonerepair","florist","perfume","clinic","vet","tutoring"].includes(c.id));
+      ["restaurant","cafe","dessert","supermarket","pharmacy","gym",
+       "kids_play","daycare","laundry","carwash","salon","juice",
+       "florist","clinic","tutoring","bakery"].includes(c.id));
 
+    // تنفيذ متوازٍ على دفعات — يختصر الوقت من ~20 ثانية إلى ~3
+    const BATCH = 8;
     const results = [];
-    for (const item of list) {
-      let places = [];
-      try { places = await nearby(loc.lat, loc.lng, item.types, radius); } catch { /* تجاهل نوعاً غير مدعوم */ }
-      const sum = summarize(places);
-      const entry = { id:item.id, label:item.label, sector:item.sector, capital:item.capital, ...sum };
-      if (item.sector !== "_ref") {
-        Object.assign(entry, opportunityScore({ ...sum, type:item.types[0], profile, radius }),
-                             { flags: financialFlags(item.types[0]) });
-      }
-      results.push(entry);
+    for (let i = 0; i < list.length; i += BATCH) {
+      const chunk = list.slice(i, i + BATCH);
+      const done = await Promise.all(chunk.map(async (item) => {
+        let places = [];
+        try { places = await nearby(loc.lat, loc.lng, item.types, radius); } catch { /* نوع غير مدعوم */ }
+        const sum = summarize(places);
+        const entry = { id:item.id, label:item.label, sector:item.sector, capital:item.capital, ...sum };
+        if (item.sector !== "_ref") {
+          Object.assign(entry, opportunityScore({ ...sum, type:item.types[0], profile, radius }),
+                               { flags: financialFlags(item.types[0]) });
+        }
+        return entry;
+      }));
+      results.push(...done);
     }
 
     const business = results.filter(r => r.sector !== "_ref");
